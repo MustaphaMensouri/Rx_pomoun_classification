@@ -14,5 +14,5 @@ train:
   enable_model_summary: false
 
 wandb:
-  project: cxr-lung-path
+  project: cxr-lung-disease-classification
   name: null   # auto-generated
