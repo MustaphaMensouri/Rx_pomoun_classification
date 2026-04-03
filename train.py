@@ -5,7 +5,7 @@ from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping, TQDMProg
 from lightning.pytorch.loggers import WandbLogger
 from omegaconf import DictConfig
 
-from src.datamodule import XrayDataModule, LABELS
+from src.datamodule import XrayDataModule
 from src.lightning_module import XrayClassifier
 
 import torch
@@ -17,7 +17,7 @@ def train(cfg: DictConfig):
     L.seed_everything(42)
 
     dm     = XrayDataModule(cfg.data)
-    model  = XrayClassifier(cfg.model, num_classes=len(LABELS), max_epochs=cfg.train.max_epochs)
+    model  = XrayClassifier(cfg.model)
     logger = WandbLogger(project=cfg.wandb.project, name=cfg.wandb.name)
 
     trainer = L.Trainer(

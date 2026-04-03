@@ -27,7 +27,6 @@ class XrayDataset(Dataset):
     def __getitem__(self, idx):
         row   = self.df.iloc[idx]
         img   = Image.open(self.data_dir / row["image_path"]).convert("RGB")
-        # 1 if any pathology present, 0 if No Finding
         label = torch.tensor(1.0 - float(row["No Finding"]), dtype=torch.float32)
         return self.transform(img), label
 
@@ -37,12 +36,14 @@ class XrayDataModule(L.LightningDataModule):
         super().__init__()
         self.cfg      = cfg
         self.train_tf = transforms.Compose([
+            transforms.Resize((224, 224)),          # ✅ Fix 4: resize before tensor ops
             transforms.RandomAffine(degrees=10, translate=(0.05, 0.05)),
             transforms.RandomAutocontrast(p=0.3),
             transforms.ToTensor(),
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
         ])
         self.val_tf   = transforms.Compose([
+            transforms.Resize((224, 224)),          # ✅ Fix 4: same for val/test
             transforms.ToTensor(),
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
         ])

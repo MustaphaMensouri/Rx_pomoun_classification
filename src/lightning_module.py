@@ -8,7 +8,7 @@ import lightning as L
 class XrayClassifier(L.LightningModule):
     def __init__(self, cfg):
         super().__init__()
-        self.save_hyperparameters(ignore=["cfg"])
+        self.save_hyperparameters()
         self.cfg = cfg
 
         backbone    = getattr(models, cfg.backbone)(weights="DEFAULT" if cfg.pretrained else None)
@@ -21,6 +21,9 @@ class XrayClassifier(L.LightningModule):
         self.prec = Precision(task="binary")
         self.recall = Recall(task="binary")
         self.f1 = F1Score(task="binary")
+
+    def forward(self, x):
+        return self.model(x)
 
     def _step(self, batch, stage):
         x, y   = batch
@@ -39,5 +42,7 @@ class XrayClassifier(L.LightningModule):
 
     def configure_optimizers(self):
         opt = torch.optim.AdamW(self.parameters(), lr=self.cfg.lr, weight_decay=self.cfg.weight_decay)
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=self.max_epochs)
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+            opt, T_max=self.trainer.max_epochs 
+        )
         return {"optimizer": opt, "lr_scheduler": scheduler}
