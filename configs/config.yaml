@@ -1,0 +1,18 @@
+defaults:
+  - data: default
+  - model: default
+  - _self_
+
+train:
+  max_epochs: 30
+  accelerator: auto
+  devices: 2                # number of GPUs
+  strategy: ddp             # DistributedDataParallel
+  precision: 16-mixed
+  log_every_n_steps: 50
+  enable_progress_bar: true
+  enable_model_summary: false
+
+wandb:
+  project: cxr-lung-path
+  name: null   # auto-generated
