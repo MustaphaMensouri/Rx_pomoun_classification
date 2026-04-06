@@ -18,7 +18,15 @@ def train(cfg: DictConfig):
 
     dm     = XrayDataModule(cfg.data)
     model  = XrayClassifier(cfg.model)
-    logger = WandbLogger(project=cfg.wandb.project, name=cfg.wandb.name)
+    api = wandb.Api()
+    try:
+        runs = api.runs(f"{cfg.wandb.entity}/{cfg.wandb.project}")
+        run_number = len(runs) + 1
+    except Exception:
+        run_number = 1
+
+    run_name = f"experiment_{run_number}"
+    logger = WandbLogger(project=cfg.wandb.project, name=run_name)
 
     trainer = L.Trainer(
         max_epochs=cfg.train.max_epochs,
