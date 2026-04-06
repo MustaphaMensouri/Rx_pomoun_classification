@@ -72,34 +72,26 @@ def save_roi(
 # tf.data loader
 # ─────────────────────────────────────────────────────────────────────────────
 
-def make_dataset(
-    src_paths:   list,
-    seg_size:    int,
-    gamma_lut:   np.ndarray,
-    batch_size:  int,
-    num_workers: int,
-) -> tf.data.Dataset:
-    gamma_tf = tf.constant(gamma_lut, dtype=tf.uint8)
+def make_dataset(src_paths, seg_size, gamma_lut, batch_size, num_workers):
 
     def load_and_preprocess(path):
         raw = tf.io.read_file(path)
         img = tf.image.decode_image(raw, channels=1, expand_animations=False)
         img = tf.image.resize(img, (seg_size, seg_size))
-        img = tf.cast(img, tf.uint8)
-        img = tf.image.grayscale_to_rgb(img)                        # (H,W,3) uint8
+        img = tf.cast(img, tf.float32)
+        img_rgb = tf.image.grayscale_to_rgb(img)  # (H,W,3)
 
-        img_gamma = tf.cast(tf.gather(gamma_tf, tf.cast(img, tf.int32)), tf.uint8)
+        # Normalize exactly like training: divide by 255
+        model_input = img_rgb / 255.0
 
-        # ResNet50 preprocessing: BGR mean subtraction
-        model_input = preprocess_input(tf.cast(img_gamma, tf.float32))
+        # Keep a uint8 copy for saving the ROI crop
+        img_uint8 = tf.cast(img_rgb, tf.uint8)
 
-        return img_gamma, model_input
+        return img_uint8, model_input
 
     return (
         tf.data.Dataset.from_tensor_slices(src_paths)
-        .map(load_and_preprocess,
-             num_parallel_calls=num_workers,
-             deterministic=True)
+        .map(load_and_preprocess, num_parallel_calls=num_workers, deterministic=True)
         .batch(batch_size)
         .prefetch(tf.data.AUTOTUNE)
     )
