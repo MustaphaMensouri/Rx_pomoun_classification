@@ -4,12 +4,14 @@ import lightning as L
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping, TQDMProgressBar
 from lightning.pytorch.loggers import WandbLogger
 from omegaconf import DictConfig
+from omegaconf.base import ContainerMetadata
+
 
 from src.datamodule import XrayDataModule
 from src.lightning_module import XrayClassifier
 
 import torch
-torch.serialization.add_safe_globals([DictConfig])
+torch.serialization.add_safe_globals([DictConfig, ContainerMetadata])
 
 
 @hydra.main(config_path="configs", config_name="config", version_base=None)
