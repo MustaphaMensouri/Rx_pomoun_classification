@@ -15,4 +15,9 @@ train:
 
 wandb:
   project: cxr-lung-disease-classification # this should be the name of your project in Weights & Biases
+  entity: 
   name: null   # auto-generated
+  notes: "baseline run"             
+  tags:
+    - baseline
+    - resnet18
