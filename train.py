@@ -3,21 +3,11 @@ import wandb
 import lightning as L
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping, TQDMProgressBar
 from lightning.pytorch.loggers import WandbLogger
-from omegaconf import DictConfig, ListConfig
-from omegaconf.base import ContainerMetadata
+from omegaconf import DictConfig
 
 
 from src.datamodule import XrayDataModule
 from src.lightning_module import XrayClassifier
-
-import torch
-_original_load = torch.load
-
-def _patched_load(*args, **kwargs):
-    kwargs.setdefault("weights_only", False)
-    return _original_load(*args, **kwargs)
-
-torch.load = _patched_load
 
 
 @hydra.main(config_path="configs", config_name="config", version_base=None)
@@ -57,7 +47,6 @@ def train(cfg: DictConfig):
     trainer.fit(model, dm)
     trainer.test(model, dm, ckpt_path="best")
     wandb.finish()
-
 
 if __name__ == "__main__":
     train()
