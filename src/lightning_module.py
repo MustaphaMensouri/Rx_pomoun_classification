@@ -2,13 +2,13 @@ import torch
 import torch.nn as nn
 from torchvision import models
 from torchmetrics import AUROC, Accuracy, Precision, Recall, F1Score
-
+from omegaconf import OmegaConf
 import lightning as L
 
 class XrayClassifier(L.LightningModule):
     def __init__(self, cfg):
         super().__init__()
-        self.save_hyperparameters()
+        self.save_hyperparameters(OmegaConf.to_container(cfg, resolve=True))
         self.cfg = cfg
 
         backbone    = getattr(models, cfg.backbone)(weights="DEFAULT" if cfg.pretrained else None)
