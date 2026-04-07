@@ -19,7 +19,7 @@ class XrayClassifier(L.LightningModule):
         self.model  = backbone
 
         # Freeze the first layers (default 50)
-        self._freeze_layers(cfg.model.frozen_layers)
+        self._freeze_layers(cfg.frozen_layers)
 
         self.loss = nn.BCEWithLogitsLoss()
 
