@@ -11,11 +11,10 @@ train:
   precision: 16-mixed
   log_every_n_steps: 50
   enable_progress_bar: true
-  enable_model_summary: false
+  enable_model_summary: true
 
 wandb:
-  project: cxr-lung-disease-classification # this should be the name of your project in Weights & Biases
-  entity: 
+  project: cxr-lung-disease-classification 
   name: null   # auto-generated
   notes: "baseline run"             
   tags:
