@@ -53,7 +53,7 @@ def train(cfg: DictConfig):
         max_epochs=cfg.train.max_epochs,
         accelerator=cfg.train.accelerator,
         devices=cfg.train.devices,
-        strategy=DDPStrategy(find_unused_parameters=False, static_graph=True) if cfg.train.devices > 1 else "auto",
+        strategy=DDPStrategy(find_unused_parameters=True, static_graph=False) if cfg.train.devices > 1 else "auto",
         precision=cfg.train.precision,
         log_every_n_steps=cfg.train.log_every_n_steps,
         enable_progress_bar=cfg.train.enable_progress_bar,
