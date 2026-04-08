@@ -42,9 +42,7 @@ class XrayClassifier(L.LightningModule):
         n = min(n, len(params))          # guard against overshooting
         for param in params[:n]:
             param.requires_grad = False
-        frozen_layers = n
-        total_layers  = len(params)
-        print(f"[XrayClassifier] Frozen {frozen_layers}/{total_layers} parameter tensors.")
+        print(f"[XrayClassifier] Frozen {n}/{len(params)} parameter tensors.")
 
     def unfreeze_all(self):
         for param in self.model.parameters():
