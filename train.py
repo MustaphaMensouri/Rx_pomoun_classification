@@ -1,6 +1,7 @@
 import hydra
 import wandb
 import lightning as L
+from lightning.pytorch.strategies import DDPStrategy
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping, TQDMProgressBar, LearningRateMonitor
 from lightning.pytorch.loggers import WandbLogger
 from omegaconf import DictConfig, OmegaConf
@@ -52,7 +53,7 @@ def train(cfg: DictConfig):
         max_epochs=cfg.train.max_epochs,
         accelerator=cfg.train.accelerator,
         devices=cfg.train.devices,
-        strategy=cfg.train.strategy,
+        strategy=DDPStrategy(find_unused_parameters=True) if cfg.train.devices > 1 else "auto",
         precision=cfg.train.precision,
         log_every_n_steps=cfg.train.log_every_n_steps,
         enable_progress_bar=cfg.train.enable_progress_bar,
