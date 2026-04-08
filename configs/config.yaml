@@ -16,6 +16,7 @@ train:
 wandb:
   project: cxr-lung-disease-classification 
   name: null   # auto-generated
+  entity: mustaphamensouri
   notes: "baseline run"             
   tags:
     - baseline
