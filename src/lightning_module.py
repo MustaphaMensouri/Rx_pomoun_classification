@@ -14,7 +14,7 @@ class XrayClassifier(L.LightningModule):
 
         # ── backbone ──────────────────────────────────────────────────────────
         backbone    = getattr(models, cfg.backbone)(weights="DEFAULT" if cfg.pretrained else None)
-        backbone.fc = nn.Linear(backbone.fc.in_features, 1)
+        backbone.classifier = nn.Linear(backbone.classifier.in_features, 1)
         self.model  = backbone
 
         # Freeze the first `cfg.frozen_layers` layers (default 50)
