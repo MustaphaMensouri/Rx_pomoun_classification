@@ -24,10 +24,10 @@ def train(cfg: DictConfig):
         run_number = 1
 
     run_name = f"experiment_{run_number}"
-    logger = WandbLogger(project=cfg.wandb.project, name=run_name, notes=cfg.wandb.notes, tags=list(cfg.wandb.tags), log_model=True)
-    logger.experiment.config.update(
-        OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
-    )
+    logger = WandbLogger(project=cfg.wandb.project, name=run_name, notes=cfg.wandb.notes, tags=list(cfg.wandb.tags), log_model=True, config=OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True))
+    # logger.experiment.config.update(
+    #     OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
+    # )
     # callbacks
     callbacks = [
         ModelCheckpoint(
