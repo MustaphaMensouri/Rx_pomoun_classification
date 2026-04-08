@@ -1,8 +1,7 @@
 import torch
 import torch.nn as nn
 from torchvision import models
-from torchmetrics import AUROC, Accuracy, Precision, Recall, F1Score
-from torchmetrics import MetricCollection
+from torchmetrics import AUROC, Accuracy, Precision, Recall, F1Score, MetricCollection
 from omegaconf import OmegaConf
 import lightning as L
 
@@ -13,16 +12,17 @@ class XrayClassifier(L.LightningModule):
         self.save_hyperparameters(OmegaConf.to_container(cfg, resolve=True))
         self.cfg = cfg
 
-        # backbone 
+        # ── backbone ──────────────────────────────────────────────────────────
         backbone    = getattr(models, cfg.backbone)(weights="DEFAULT" if cfg.pretrained else None)
         backbone.fc = nn.Linear(backbone.fc.in_features, 1)
         self.model  = backbone
 
-        # Freeze the first layers (default 50)
-        self._freeze_layers(cfg.frozen_layers)
+        # Freeze the first `cfg.frozen_layers` layers (default 50)
+        self._freeze_layers(getattr(cfg, "frozen_layers", 50))
 
         self.loss = nn.BCEWithLogitsLoss()
 
+        # ── separate MetricCollections per stage ──────────────────────────────
         def _metrics():
             return MetricCollection({
                 "auc":    AUROC(task="binary"),
@@ -39,7 +39,7 @@ class XrayClassifier(L.LightningModule):
     # ── layer freezing ────────────────────────────────────────────────────────
     def _freeze_layers(self, n: int):
         params = list(self.model.parameters())
-        n = min(n, len(params))          # guard against overshooting
+        n = min(n, len(params))
         for param in params[:n]:
             param.requires_grad = False
         print(f"[XrayClassifier] Frozen {n}/{len(params)} parameter tensors.")
@@ -48,56 +48,52 @@ class XrayClassifier(L.LightningModule):
         for param in self.model.parameters():
             param.requires_grad = True
 
-    # forward
+    # ── forward ───────────────────────────────────────────────────────────────
     def forward(self, x):
         return self.model(x)
 
-    # shared step
+    # ── shared step ───────────────────────────────────────────────────────────
     def _step(self, batch, stage: str):
         x, y   = batch
         logits = self(x).squeeze(1)
         loss   = self.loss(logits, y.float())
-        probs  = torch.sigmoid(logits).detach()
+        probs  = torch.sigmoid(logits)
 
-        {"train": self.train_metrics,
-         "val":   self.val_metrics,
-         "test":  self.test_metrics}[stage].update(probs, y.int())
+        metrics = {
+            "train": self.train_metrics,
+            "val":   self.val_metrics,
+            "test":  self.test_metrics,
+        }[stage]
 
-        self.log(f"{stage}/loss", loss, prog_bar=True,
-                 on_step=False, on_epoch=True, sync_dist=True)
+        # update accumulators
+        metrics.update(probs, y.int())
+
+        # pass metric OBJECTS (not .compute()) to self.log_dict
+        # Lightning syncs internal state across DDP ranks before computing
+        self.log(f"{stage}/loss", loss,
+                 prog_bar=True, on_step=False, on_epoch=True, sync_dist=True)
+        self.log_dict(
+            {f"{stage}/{k}": metrics[k] for k in metrics},
+            prog_bar=True, on_step=False, on_epoch=True, sync_dist=True,
+        )
+
         return loss
 
     def training_step(self, batch, _):   return self._step(batch, "train")
     def validation_step(self, batch, _): return self._step(batch, "val")
     def test_step(self, batch, _):       return self._step(batch, "test")
 
-    #  epoch-end hooks (log accumulated metrics) 
-    def on_train_epoch_end(self):
-        self.log_dict({f"train/{k}": v for k, v in self.train_metrics.compute().items()},
-                      prog_bar=True, sync_dist=True,)
-        self.train_metrics.reset()
-
-    def on_validation_epoch_end(self):
-        self.log_dict({f"val/{k}": v for k, v in self.val_metrics.compute().items()},
-                      prog_bar=True, sync_dist=True)
-        self.val_metrics.reset()
-
-    def on_test_epoch_end(self):
-        self.log_dict({f"test/{k}": v for k, v in self.test_metrics.compute().items()},
-                      prog_bar=True, sync_dist=True,)
-        self.test_metrics.reset()
-
-    # optimiser + scheduler
+    # ── optimiser + scheduler ─────────────────────────────────────────────────
     def configure_optimizers(self):
         trainable = [p for p in self.parameters() if p.requires_grad]
         opt = torch.optim.AdamW(trainable, lr=self.cfg.lr,
                                 weight_decay=self.cfg.weight_decay)
 
-        # Warmup (default 10%) of training, then cosine decay — much smoother than
-        warmup_steps = max(1, int(self.trainer.max_epochs * self.cfg.warmup))
+        warmup_steps = max(1, int(self.trainer.max_epochs * 0.1))
+
         def lr_lambda(epoch):
             if epoch < warmup_steps:
-                return epoch / warmup_steps          # linear warm-up
+                return epoch / warmup_steps
             progress = (epoch - warmup_steps) / max(1, self.trainer.max_epochs - warmup_steps)
             return 0.5 * (1.0 + torch.cos(torch.tensor(3.14159 * progress)).item())
 
