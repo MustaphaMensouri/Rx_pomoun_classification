@@ -57,16 +57,12 @@ class XrayClassifier(L.LightningModule):
         x, y   = batch
         logits = self(x).squeeze(1)
         loss   = self.loss(logits, y.float())
-        probs  = torch.sigmoid(logits)
-        y_int  = y.int()
+        probs  = torch.sigmoid(logits).detach()
 
-        metrics = {
-            "train": self.train_metrics,
-            "val":   self.val_metrics,
-            "test":  self.test_metrics,
-        }[stage]
+        {"train": self.train_metrics,
+         "val":   self.val_metrics,
+         "test":  self.test_metrics}[stage].update(probs, y.int())
 
-        metrics.update(probs, y_int)
         self.log(f"{stage}/loss", loss, prog_bar=True,
                  on_step=False, on_epoch=True, sync_dist=True)
         return loss
@@ -78,7 +74,7 @@ class XrayClassifier(L.LightningModule):
     #  epoch-end hooks (log accumulated metrics) 
     def on_train_epoch_end(self):
         self.log_dict({f"train/{k}": v for k, v in self.train_metrics.compute().items()},
-                      prog_bar=True, sync_dist=True, rank_zero_only=False,)
+                      prog_bar=True, sync_dist=True,)
         self.train_metrics.reset()
 
     def on_validation_epoch_end(self):
@@ -88,12 +84,11 @@ class XrayClassifier(L.LightningModule):
 
     def on_test_epoch_end(self):
         self.log_dict({f"test/{k}": v for k, v in self.test_metrics.compute().items()},
-                      prog_bar=True, sync_dist=True, rank_zero_only=False,)
+                      prog_bar=True, sync_dist=True,)
         self.test_metrics.reset()
 
     # optimiser + scheduler
     def configure_optimizers(self):
-        # Only pass parameters that are actually being trained
         trainable = [p for p in self.parameters() if p.requires_grad]
         opt = torch.optim.AdamW(trainable, lr=self.cfg.lr,
                                 weight_decay=self.cfg.weight_decay)
