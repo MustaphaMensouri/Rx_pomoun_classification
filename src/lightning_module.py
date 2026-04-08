@@ -78,7 +78,7 @@ class XrayClassifier(L.LightningModule):
     #  epoch-end hooks (log accumulated metrics) 
     def on_train_epoch_end(self):
         self.log_dict({f"train/{k}": v for k, v in self.train_metrics.compute().items()},
-                      prog_bar=True, sync_dist=True)
+                      prog_bar=True, sync_dist=True, rank_zero_only=False,)
         self.train_metrics.reset()
 
     def on_validation_epoch_end(self):
@@ -88,7 +88,7 @@ class XrayClassifier(L.LightningModule):
 
     def on_test_epoch_end(self):
         self.log_dict({f"test/{k}": v for k, v in self.test_metrics.compute().items()},
-                      prog_bar=True, sync_dist=True)
+                      prog_bar=True, sync_dist=True, rank_zero_only=False,)
         self.test_metrics.reset()
 
     # optimiser + scheduler
