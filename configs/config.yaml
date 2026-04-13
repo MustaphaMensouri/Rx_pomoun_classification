@@ -5,7 +5,9 @@ defaults:
 
 train:
   max_epochs: 30
-  accelerator: auto
+  batch_size: 32
+  gradient_accumulation_steps: 4
+  accelerator: "gpu"
   devices: 2                # number of GPUs
   strategy: ddp             # DistributedDataParallel
   precision: 16-mixed
@@ -15,9 +17,10 @@ train:
 
 wandb:
   project: cxr-lung-disease-classification 
-  name: null   # auto-generated
+  name: null
   entity: mustaphamensouri
   notes: "baseline run"             
   tags:
     - baseline
-    - resnet18
+    - Vit
+    - google/vit-large-patch16-384

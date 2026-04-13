@@ -1,6 +1,7 @@
-backbone: densenet121
-pretrained: true
-lr: 3e-5
-weight_decay: 1e-5
-frozen_layers: 50
-warmup: 0.1
+vit_checkpoint: "google/vit-large-patch16-384" 
+img_size: 384
+frozen_layers: 6
+layer_lr_decay: 0.85 
+lr: 1e-4              
+weight_decay: 0.05
+pos_weight: 1.43   

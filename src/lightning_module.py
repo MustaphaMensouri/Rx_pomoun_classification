@@ -3,6 +3,7 @@ import torch.nn as nn
 from torchvision import models
 from torchmetrics import AUROC, Accuracy, Precision, Recall, F1Score, MetricCollection
 from omegaconf import OmegaConf
+from transformers import ViTForImageClassification, ViTModel
 import lightning as L
 
 
@@ -13,14 +14,17 @@ class XrayClassifier(L.LightningModule):
         self.cfg = cfg
 
         # ── backbone ──────────────────────────────────────────────────────────
-        backbone    = getattr(models, cfg.backbone)(weights="DEFAULT" if cfg.pretrained else None)
-        backbone.classifier = nn.Linear(backbone.classifier.in_features, 1)
-        self.model  = backbone
+        vit = ViTModel.from_pretrained(cfg.vit_checkpoint)  # e.g. "google/vit-base-patch16-224-in21k"
+        self.model = vit
+        hidden_size = vit.config.hidden_size  # 768 for base, 1024 for large
+        self.classifier = nn.Linear(hidden_size, 1)
 
         # Freeze the first `cfg.frozen_layers` layers (default 50)
-        self._freeze_layers(getattr(cfg, "frozen_layers", 50))
+        self._freeze_layers(getattr(cfg, "frozen_layers", 0))
+        self.loss = nn.BCEWithLogitsLoss(
+            pos_weight=torch.tensor([cfg.get("pos_weight", 1.0)])  # handles class imbalance in NIH
+        )
 
-        self.loss = nn.BCEWithLogitsLoss()
 
         # ── separate MetricCollections per stage ──────────────────────────────
         def _metrics():
@@ -38,19 +42,20 @@ class XrayClassifier(L.LightningModule):
 
     # ── layer freezing ────────────────────────────────────────────────────────
     def _freeze_layers(self, n: int):
-        params = list(self.model.parameters())
-        n = min(n, len(params))
-        for param in params[:n]:
-            param.requires_grad = False
-        print(f"[XrayClassifier] Frozen {n}/{len(params)} parameter tensors.")
-
+        for i, layer in enumerate(self.model.encoder.layer):
+            if i < n:
+                for param in layer.parameters():
+                    param.requires_grad = False
+        print(f"[XrayClassifier] Frozen first {n} ViT encoder blocks.")
     def unfreeze_all(self):
         for param in self.model.parameters():
             param.requires_grad = True
 
     # ── forward ───────────────────────────────────────────────────────────────
     def forward(self, x):
-        return self.model(x)
+        outputs = self.model(pixel_values=x)
+        cls_token = outputs.last_hidden_state[:, 0]  # [CLS] token
+        return self.classifier(cls_token)
 
     # ── shared step ───────────────────────────────────────────────────────────
     def _step(self, batch, stage: str):
@@ -85,8 +90,9 @@ class XrayClassifier(L.LightningModule):
 
     # ── optimiser + scheduler ─────────────────────────────────────────────────
     def configure_optimizers(self):
-        trainable = [p for p in self.parameters() if p.requires_grad]
-        opt = torch.optim.AdamW(trainable, lr=self.cfg.lr,
+        param_groups = self._get_vit_param_groups()
+        opt = torch.optim.AdamW(param_groups,
+                                lr=self.cfg.lr,
                                 weight_decay=self.cfg.weight_decay)
 
         warmup_steps = max(1, int(self.trainer.max_epochs * 0.1))
@@ -102,3 +108,32 @@ class XrayClassifier(L.LightningModule):
             "optimizer":    opt,
             "lr_scheduler": {"scheduler": scheduler, "interval": "epoch"},
         }
+    
+    def _get_vit_param_groups(self):
+        """Layer-wise LR decay: deeper layers get higher LR."""
+        decay = getattr(self.cfg, "layer_lr_decay", 0.85)
+        num_layers = self.model.config.num_hidden_layers  # 12 for base
+
+        param_groups = []
+
+        # Classifier head — full LR
+        param_groups.append({
+            "params": list(self.classifier.parameters()),
+            "lr": self.cfg.lr
+        })
+
+        # Encoder layers — decayed LR
+        for i, layer in enumerate(reversed(self.model.encoder.layer)):
+            lr = self.cfg.lr * (decay ** (i + 1))
+            param_groups.append({
+                "params": [p for p in layer.parameters() if p.requires_grad],
+                "lr": lr
+            })
+
+        # Embeddings — lowest LR
+        param_groups.append({
+            "params": [p for p in self.model.embeddings.parameters() if p.requires_grad],
+            "lr": self.cfg.lr * (decay ** (num_layers + 1))
+        })
+
+        return param_groups
