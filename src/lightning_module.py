@@ -14,7 +14,8 @@ class XrayClassifier(L.LightningModule):
         self.cfg = cfg
 
         # ── backbone ──────────────────────────────────────────────────────────
-        vit = ViTModel.from_pretrained(cfg.vit_checkpoint)  # e.g. "google/vit-base-patch16-224-in21k"
+        vit = ViTModel.from_pretrained(cfg.vit_checkpoint)
+        vit.gradient_checkpointing_enable()
         self.model = vit
         hidden_size = vit.config.hidden_size  # 768 for base, 1024 for large
         self.classifier = nn.Linear(hidden_size, 1)

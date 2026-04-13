@@ -9,7 +9,7 @@ train:
   gradient_accumulation_steps: 4
   accelerator: "gpu"
   devices: 2                # number of GPUs
-  strategy: ddp             # DistributedDataParallel
+  strategy: "fsdp"          
   precision: 16-mixed
   log_every_n_steps: 50
   enable_progress_bar: true
