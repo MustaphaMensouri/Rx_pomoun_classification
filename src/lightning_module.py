@@ -26,6 +26,7 @@ class XrayClassifier(L.LightningModule):
         self.loss = nn.BCEWithLogitsLoss(
             pos_weight=torch.tensor([cfg.get("pos_weight", 1.0)])  # handles class imbalance in NIH
         )
+        self.model.train()
 
 
         # ── separate MetricCollections per stage ──────────────────────────────
