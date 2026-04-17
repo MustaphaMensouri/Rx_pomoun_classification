@@ -17,6 +17,7 @@ class XrayClassifier(L.LightningModule):
         dino.gradient_checkpointing_enable()
         self.model = dino
         hidden_size = dino.config.hidden_size
+        self.dropout = nn.Dropout(cfg.get("dropout", 0.0))
         self.classifier = nn.Linear(hidden_size, 1)
 
         # Freeze the first `cfg.frozen_layers` layers (default 50)
@@ -56,7 +57,7 @@ class XrayClassifier(L.LightningModule):
     def forward(self, x):
         outputs = self.model(pixel_values=x)
         cls_token = outputs.last_hidden_state[:, 0]  # [CLS] token
-        return self.classifier(cls_token)
+        return self.classifier(self.dropout(cls_token))
 
     # ── shared step ───────────────────────────────────────────────────────────
     def _step(self, batch, stage: str):

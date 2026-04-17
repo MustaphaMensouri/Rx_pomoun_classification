@@ -1,6 +1,7 @@
 vit_checkpoint: "google/vit-base-patch16-224" 
-frozen_layers: 6
+frozen_layers: 0
 layer_lr_decay: 0.85 
 lr: 1e-4              
 weight_decay: 0.05
 pos_weight: 1.43   
+dropout: 0.2
