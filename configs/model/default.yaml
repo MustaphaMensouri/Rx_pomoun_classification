@@ -1,5 +1,4 @@
-vit_checkpoint: "google/vit-large-patch16-384" 
-img_size: 384
+vit_checkpoint: "google/vit-base-patch16-224" 
 frozen_layers: 6
 layer_lr_decay: 0.85 
 lr: 1e-4              
