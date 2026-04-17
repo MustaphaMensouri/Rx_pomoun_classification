@@ -3,7 +3,7 @@ import torch.nn as nn
 from torchvision import models
 from torchmetrics import AUROC, Accuracy, Precision, Recall, F1Score, MetricCollection
 from omegaconf import OmegaConf
-from transformers import ViTForImageClassification, ViTModel
+from transformers import ViTModel, AutoModel
 import lightning as L
 
 
@@ -13,12 +13,10 @@ class XrayClassifier(L.LightningModule):
         self.save_hyperparameters(OmegaConf.to_container(cfg, resolve=True))
         self.cfg = cfg
 
-        # ── backbone ──────────────────────────────────────────────────────────
-        vit = ViTModel.from_pretrained(cfg.vit_checkpoint)
-        vit.gradient_checkpointing_enable()
-        vit.pooler = None
-        self.model = vit
-        hidden_size = vit.config.hidden_size  # 768 for base, 1024 for large
+        dino = AutoModel.from_pretrained(cfg.vit_checkpoint)  # works for any HF model
+        dino.gradient_checkpointing_enable()
+        self.model = dino
+        hidden_size = dino.config.hidden_size
         self.classifier = nn.Linear(hidden_size, 1)
 
         # Freeze the first `cfg.frozen_layers` layers (default 50)
