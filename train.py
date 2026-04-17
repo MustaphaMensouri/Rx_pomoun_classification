@@ -40,7 +40,7 @@ def train(cfg: DictConfig):
         EarlyStopping(
             monitor="val/auc",
             mode="max",
-            patience=cfg.train.get("early_stopping_patience", 10),  # from config, not hardcoded
+            patience=cfg.train.get("early_stopping_patience", 3),  # from config, not hardcoded
             min_delta=1e-4,       # ignore improvements
             verbose=True,
         ),
