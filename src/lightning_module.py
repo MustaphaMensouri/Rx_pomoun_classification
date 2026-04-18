@@ -26,7 +26,8 @@ class XrayClassifier(L.LightningModule):
         # Freeze the first `cfg.frozen_layers` layers (default 50)
         self._freeze_layers(getattr(cfg, "frozen_layers", 50))
 
-        self.loss = nn.BCEWithLogitsLoss(pos_weight=cfg.get("pos_weight", 1.0))
+        pos_weight = cfg.get("pos_weight", 1.0)
+        self.loss = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([pos_weight]))
 
         # ── separate MetricCollections per stage ──────────────────────────────
         def _metrics():
