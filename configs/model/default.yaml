@@ -1,6 +1,6 @@
-backbone: densenet121
+backbone: densenet121_chex
 pretrained: true
-lr: 3e-5
+lr: 1e-5
 weight_decay: 1e-5
 frozen_layers: 50
 warmup: 0.1

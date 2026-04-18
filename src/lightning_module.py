@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from torchvision import models
+import torchxrayvision as xrv
 from torchmetrics import AUROC, Accuracy, Precision, Recall, F1Score, MetricCollection
 from omegaconf import OmegaConf
 import lightning as L
@@ -13,8 +13,13 @@ class XrayClassifier(L.LightningModule):
         self.cfg = cfg
 
         # ── backbone ──────────────────────────────────────────────────────────
-        backbone    = getattr(models, cfg.backbone)(weights="DEFAULT" if cfg.pretrained else None)
-        backbone.classifier = nn.Linear(backbone.classifier.in_features, 1)
+        if cfg.backbone == "densenet121_chex":
+            backbone = xrv.models.DenseNet(weights="densenet121-res224-chex")
+        elif cfg.backbone == "densenet121_mimic":
+            backbone = xrv.models.DenseNet(weights="densenet121-res224-mimic_ch")
+        else:
+            backbone = xrv.models.DenseNet(weights=None)
+        backbone.fc = nn.Linear(backbone.fc.in_features, 1)
         self.model  = backbone
 
         # Freeze the first `cfg.frozen_layers` layers (default 50)
