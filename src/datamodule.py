@@ -6,6 +6,12 @@ from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 import lightning as L
 import torchxrayvision as xrv
+import numpy as np
+
+def _xrv_normalize(x: torch.Tensor) -> torch.Tensor:
+    arr = x.numpy()                                      
+    arr = xrv.datasets.normalize(arr, maxval=1.0, reshape=True)
+    return torch.from_numpy(arr)   
 
 
 LABELS = [
@@ -41,16 +47,12 @@ class XrayDataModule(L.LightningDataModule):
             transforms.RandomAffine(degrees=10, translate=(0.05, 0.05)),
             transforms.RandomAutocontrast(p=0.3),
             transforms.ToTensor(),
-            transforms.Lambda(
-                lambda x: xrv.datasets.normalize(x, maxval=1.0, reshape=True)
-            ),
+            transforms.Lambda(_xrv_normalize),
         ])
         self.val_tf   = transforms.Compose([
             transforms.Resize((224, 224)),  
             transforms.ToTensor(),
-            transforms.Lambda(
-                lambda x: xrv.datasets.normalize(x, maxval=1.0, reshape=True)
-            ),
+            transforms.Lambda(_xrv_normalize),
         ])
 
     def _loader(self, split, transform, shuffle=False):
