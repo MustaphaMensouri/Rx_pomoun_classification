@@ -4,6 +4,7 @@ import torchxrayvision as xrv
 from torchmetrics import AUROC, Accuracy, Precision, Recall, F1Score, MetricCollection
 from omegaconf import OmegaConf
 import lightning as L
+import math
 
 
 class XrayClassifier(L.LightningModule):
@@ -19,13 +20,13 @@ class XrayClassifier(L.LightningModule):
             backbone = xrv.models.DenseNet(weights="densenet121-res224-mimic_ch")
         else:
             backbone = xrv.models.DenseNet(weights=None)
-        backbone.fc = nn.Linear(backbone.fc.in_features, 1)
+        backbone.classifier = nn.Linear(backbone.classifier.in_features, 1)
         self.model  = backbone
 
         # Freeze the first `cfg.frozen_layers` layers (default 50)
         self._freeze_layers(getattr(cfg, "frozen_layers", 50))
 
-        self.loss = nn.BCEWithLogitsLoss()
+        self.loss = nn.BCEWithLogitsLoss(pos_weight=cfg.get("pos_weight", 1.0))
 
         # ── separate MetricCollections per stage ──────────────────────────────
         def _metrics():
@@ -40,6 +41,11 @@ class XrayClassifier(L.LightningModule):
         self.train_metrics = _metrics()
         self.val_metrics   = _metrics()
         self.test_metrics  = _metrics()
+    def on_train_epoch_end(self):
+        self.train_metrics.reset()
+
+    def on_val_epoch_end(self):
+        self.val_metrics.reset()
 
     # ── layer freezing ────────────────────────────────────────────────────────
     def _freeze_layers(self, n: int):
@@ -100,7 +106,7 @@ class XrayClassifier(L.LightningModule):
             if epoch < warmup_steps:
                 return epoch / warmup_steps
             progress = (epoch - warmup_steps) / max(1, self.trainer.max_epochs - warmup_steps)
-            return 0.5 * (1.0 + torch.cos(torch.tensor(3.14159 * progress)).item())
+            return 0.5 * (1.0 + math.cos(math.pi * progress))
 
         scheduler = torch.optim.lr_scheduler.LambdaLR(opt, lr_lambda)
         return {

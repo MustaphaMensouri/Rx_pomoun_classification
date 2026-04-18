@@ -5,6 +5,7 @@ from PIL import Image
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 import lightning as L
+import torchxrayvision as xrv
 
 
 LABELS = [
@@ -26,7 +27,7 @@ class XrayDataset(Dataset):
 
     def __getitem__(self, idx):
         row   = self.df.iloc[idx]
-        img   = Image.open(self.data_dir / row["image_path"]).convert("RGB")
+        img   = Image.open(self.data_dir / row["image_path"]).convert("L")
         label = torch.tensor(1.0 - float(row["No Finding"]), dtype=torch.float32)
         return self.transform(img), label
 
@@ -36,16 +37,20 @@ class XrayDataModule(L.LightningDataModule):
         super().__init__()
         self.cfg      = cfg
         self.train_tf = transforms.Compose([
-            transforms.Resize((224, 224)),          # ✅ Fix 4: resize before tensor ops
+            transforms.Resize((224, 224)),     
             transforms.RandomAffine(degrees=10, translate=(0.05, 0.05)),
             transforms.RandomAutocontrast(p=0.3),
             transforms.ToTensor(),
-            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+            transforms.Lambda(
+                lambda x: xrv.datasets.normalize(x, maxval=1.0, reshape=True)
+            ),
         ])
         self.val_tf   = transforms.Compose([
-            transforms.Resize((224, 224)),          # ✅ Fix 4: same for val/test
+            transforms.Resize((224, 224)),  
             transforms.ToTensor(),
-            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+            transforms.Lambda(
+                lambda x: xrv.datasets.normalize(x, maxval=1.0, reshape=True)
+            ),
         ])
 
     def _loader(self, split, transform, shuffle=False):
