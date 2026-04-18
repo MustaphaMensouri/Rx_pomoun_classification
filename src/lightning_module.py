@@ -5,6 +5,7 @@ from torchmetrics import AUROC, Accuracy, Precision, Recall, F1Score, MetricColl
 from omegaconf import OmegaConf
 import lightning as L
 import math
+import torch.nn.functional as F
 
 
 class XrayClassifier(L.LightningModule):
@@ -20,14 +21,18 @@ class XrayClassifier(L.LightningModule):
             backbone = xrv.models.DenseNet(weights="densenet121-res224-mimic_ch")
         else:
             backbone = xrv.models.DenseNet(weights=None)
-        backbone.classifier = nn.Linear(backbone.classifier.in_features, 1)
-        self.model  = backbone
+        
+        self.features = backbone.features          # DenseNet feature layers
+        self.classifier = nn.Linear(backbone.classifier.in_features, 1)
+        
 
         # Freeze the first `cfg.frozen_layers` layers (default 50)
         self._freeze_layers(getattr(cfg, "frozen_layers", 50))
 
-        pos_weight = cfg.get("pos_weight", 1.0)
-        self.loss = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([pos_weight]))
+        pos_weight = getattr(cfg, "pos_weight", 1.0)
+        self.loss = nn.BCEWithLogitsLoss(
+            pos_weight=torch.tensor([pos_weight], dtype=torch.float32)
+        )
 
         # ── separate MetricCollections per stage ──────────────────────────────
         def _metrics():
@@ -47,22 +52,29 @@ class XrayClassifier(L.LightningModule):
 
     def on_val_epoch_end(self):
         self.val_metrics.reset()
+    def on_test_epoch_end(self):
+        self.test_metrics.reset()
 
     # ── layer freezing ────────────────────────────────────────────────────────
     def _freeze_layers(self, n: int):
-        params = list(self.model.parameters())
+        # freeze across features + classifier together
+        params = list(self.features.parameters()) + list(self.classifier.parameters())
         n = min(n, len(params))
         for param in params[:n]:
             param.requires_grad = False
         print(f"[XrayClassifier] Frozen {n}/{len(params)} parameter tensors.")
 
     def unfreeze_all(self):
-        for param in self.model.parameters():
+        for param in self.parameters():
             param.requires_grad = True
 
     # ── forward ───────────────────────────────────────────────────────────────
     def forward(self, x):
-        return self.model(x)
+        out = self.features(x)
+        out = F.relu(out, inplace=True)
+        out = F.adaptive_avg_pool2d(out, (1, 1))
+        out = torch.flatten(out, 1)
+        return self.classifier(out)
 
     # ── shared step ───────────────────────────────────────────────────────────
     def _step(self, batch, stage: str):
@@ -105,7 +117,7 @@ class XrayClassifier(L.LightningModule):
 
         def lr_lambda(epoch):
             if epoch < warmup_steps:
-                return epoch / warmup_steps
+                return  (epoch + 1) / warmup_steps
             progress = (epoch - warmup_steps) / max(1, self.trainer.max_epochs - warmup_steps)
             return 0.5 * (1.0 + math.cos(math.pi * progress))
 
