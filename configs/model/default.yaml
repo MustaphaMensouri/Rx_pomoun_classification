@@ -1,4 +1,4 @@
-vit_checkpoint: "google/vit-base-patch16-224" 
+vit_checkpoint: "facebook/dinov2-base" 
 frozen_layers: 0
 layer_lr_decay: 0.85 
 lr: 1e-4              

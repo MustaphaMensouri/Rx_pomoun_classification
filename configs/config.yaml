@@ -24,4 +24,4 @@ wandb:
   tags:
     - baseline
     - Vit
-    - google/vit-large-patch16-384
+    - facebook/dinov2-base
