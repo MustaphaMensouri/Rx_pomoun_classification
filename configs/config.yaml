@@ -17,6 +17,7 @@ train:
   early_stopping_patience: 3
 
 wandb:
+  enabled: true
   project: cxr-lung-disease-classification 
   name: null
   entity: mustaphamensouri

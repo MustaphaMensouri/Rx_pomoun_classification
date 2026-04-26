@@ -2,7 +2,7 @@ import hydra
 import wandb
 import lightning as L
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping, TQDMProgressBar, LearningRateMonitor
-from lightning.pytorch.loggers import WandbLogger
+from lightning.pytorch.loggers import WandbLogger, CSVLogger
 from omegaconf import DictConfig, OmegaConf
 from lightning.pytorch.strategies import DDPStrategy
 
@@ -17,15 +17,22 @@ def train(cfg: DictConfig):
 
     dm     = XrayDataModule(cfg.data)
     model  = XrayClassifier(cfg.model)
-    api = wandb.Api()
-    try:
-        runs = api.runs(f"{cfg.wandb.entity}/{cfg.wandb.project}")
-        run_number = len(runs) + 1
-    except Exception:
-        run_number = 1
 
-    run_name = f"experiment_{run_number}"
-    logger = WandbLogger(project=cfg.wandb.project, name=run_name, notes=cfg.wandb.notes, tags=list(cfg.wandb.tags), log_model=True, config=OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True))
+    use_wandb = cfg.wandb.get("enabled", True)
+
+    if use_wandb:
+        api = wandb.Api()
+        try:
+            runs = api.runs(f"{cfg.wandb.entity}/{cfg.wandb.project}")
+            run_number = len(runs) + 1
+        except Exception:
+            run_number = 1
+
+        run_name = f"experiment_{run_number}"
+        logger = WandbLogger(project=cfg.wandb.project, name=run_name, notes=cfg.wandb.notes, tags=list(cfg.wandb.tags), log_model=True, config=OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True))
+    else:
+        logger = CSVLogger(save_dir="logs/", name="local_run")
+        print("[Logger] W&B disabled — logging to terminal + CSV (logs/local_run/)")
     # logger.experiment.config.update(
     #     OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
     # )
@@ -67,7 +74,9 @@ def train(cfg: DictConfig):
 
     trainer.fit(model, dm)
     trainer.test(model, dm, ckpt_path="best")
-    wandb.finish()
+    if use_wandb:
+        wandb.finish()
+    print(f"\nBest checkpoint saved to: best.ckpt")
 
 if __name__ == "__main__":
     train()
